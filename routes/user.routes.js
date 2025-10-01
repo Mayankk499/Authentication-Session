@@ -1,12 +1,36 @@
 import express from "express";
 import db from "../db/index.db.js";
-import { usersTable, userSessions } from "../db/schema.db.js";
+import {usersTable, userSessions} from '../db/schema.js';
 import { eq } from "drizzle-orm";
 import { randomBytes, createHmac } from "crypto";
 
 const router = express.Router();
 
-router.get("/", () => {});
+router.put('/', async (req, res) => {
+  // console.log("REQ.USER:", req.user);
+  const user = req.user;
+  if (!user) {
+    return res.status(401).json({ error: "login failed!" });
+  }
+
+  const { name } = req.body;
+  await db.update(usersTable)
+    .set({ name })
+    .where(eq(usersTable.id, user.id));
+
+  return res.json({ status: 'updated successfully' });
+});
+
+
+
+router.get("/", async (req, res) => {
+  const user = req.user;
+  if (!user) {
+    return res.status(401).json({ error: "login failed!" });
+  }
+
+  return res.json({ user });
+});
 
 router.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
@@ -55,7 +79,7 @@ router.post("/login", async (req, res) => {
 
   if (!existingUser) {
     return res.status(404).json({ error: "user not found" });
-  };
+  }
 
   const salt = existingUser.salt;
   const existingHash = existingUser.password;
@@ -64,11 +88,14 @@ router.post("/login", async (req, res) => {
 
   if (newHash !== existingHash) {
     return res.status(400).json({ error: "Incorrect password" });
-  };
+  }
 
-  const [session] = await db.insert(userSessions).values({
-    userId: existingUser.id,
-  }).returning({id: userSessions.id});
+  const [session] = await db
+    .insert(userSessions)
+    .values({
+      userId: existingUser.id,
+    })
+    .returning({ id: userSessions.id });
   return res.json({ status: "success", sessionId: session.id });
 });
 
