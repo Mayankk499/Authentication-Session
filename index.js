@@ -1,39 +1,34 @@
 import "dotenv/config";
 import express from "express";
 import userRouter from "./routes/user.routes.js";
-import db from "./db/index.db.js";
-import { usersTable, userSessions } from "./db/schema.js";
-
-import { eq } from "drizzle-orm";
+import jwt from "jsonwebtoken";
 const app = express();
 const PORT = process.env.PORT;
 
 app.use(express.json());
+
 app.use(async function (req, res, next) {
-  const sessionId = req.headers["session-id"];
-  if (!sessionId) {
-    return next();
+  try {
+    const tokenHeader = req.headers["authorization"];
+  
+    if (!tokenHeader) {
+      return next();
+    }
+  
+    if (!tokenHeader.startsWith("Bearer")) {
+      return res
+        .status(400)
+        .json({ error: "Authorization must be starts with bearer" });
+    }
+  
+    const token = tokenHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  
+    req.user = decoded;
+    next();
+  } catch (error) {
+    next();
   }
-
-  const [data] = await db
-    .select({
-      sessionId: userSessions.id,
-      id: usersTable.id,
-      userId: userSessions.userId,
-      name: usersTable.name,
-      email: usersTable.email,
-    })
-    .from(userSessions)
-    .rightJoin(usersTable, eq(usersTable.id, userSessions.userId))
-    .where(eq(userSessions.id, sessionId));
-
-
-  if (!data) {
-    return next();
-  }
-
-  req.user = data;
-  next();
 });
 
 app.get("/", (req, res) => {

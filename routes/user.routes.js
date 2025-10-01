@@ -1,12 +1,13 @@
 import express from "express";
 import db from "../db/index.db.js";
-import {usersTable, userSessions} from '../db/schema.js';
+import { usersTable } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { randomBytes, createHmac } from "crypto";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
-router.put('/', async (req, res) => {
+router.put("/", async (req, res) => {
   // console.log("REQ.USER:", req.user);
   const user = req.user;
   if (!user) {
@@ -14,14 +15,10 @@ router.put('/', async (req, res) => {
   }
 
   const { name } = req.body;
-  await db.update(usersTable)
-    .set({ name })
-    .where(eq(usersTable.id, user.id));
+  await db.update(usersTable).set({ name }).where(eq(usersTable.id, user.id));
 
-  return res.json({ status: 'updated successfully' });
+  return res.json({ status: "updated successfully" });
 });
-
-
 
 router.get("/", async (req, res) => {
   const user = req.user;
@@ -70,6 +67,7 @@ router.post("/login", async (req, res) => {
   const [existingUser] = await db
     .select({
       id: usersTable.id,
+      name: usersTable.name,
       email: usersTable.email,
       salt: usersTable.salt,
       password: usersTable.password,
@@ -90,13 +88,16 @@ router.post("/login", async (req, res) => {
     return res.status(400).json({ error: "Incorrect password" });
   }
 
-  const [session] = await db
-    .insert(userSessions)
-    .values({
-      userId: existingUser.id,
-    })
-    .returning({ id: userSessions.id });
-  return res.json({ status: "success", sessionId: session.id });
+  const payload = {
+    id: existingUser.id,
+    email: existingUser.email,
+    name: existingUser.name,
+
+  };
+
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1m" });
+
+  return res.json({ status: "success", token });
 });
 
 export default router;
