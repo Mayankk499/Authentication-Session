@@ -4,15 +4,11 @@ import { usersTable } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { randomBytes, createHmac } from "crypto";
 import jwt from "jsonwebtoken";
+import { ensureAuthenticated } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-router.put("/", async (req, res) => {
-  // console.log("REQ.USER:", req.user);
-  const user = req.user;
-  if (!user) {
-    return res.status(401).json({ error: "login failed!" });
-  }
+router.put("/", ensureAuthenticated, async (req, res) => {
 
   const { name } = req.body;
   await db.update(usersTable).set({ name }).where(eq(usersTable.id, user.id));
@@ -20,11 +16,7 @@ router.put("/", async (req, res) => {
   return res.json({ status: "updated successfully" });
 });
 
-router.get("/", async (req, res) => {
-  const user = req.user;
-  if (!user) {
-    return res.status(401).json({ error: "login failed!" });
-  }
+router.get("/", ensureAuthenticated, async (req, res) => {
 
   return res.json({ user });
 });
@@ -70,6 +62,7 @@ router.post("/login", async (req, res) => {
       name: usersTable.name,
       email: usersTable.email,
       salt: usersTable.salt,
+      role: usersTable.role,
       password: usersTable.password,
     })
     .from(usersTable)
@@ -92,6 +85,7 @@ router.post("/login", async (req, res) => {
     id: existingUser.id,
     email: existingUser.email,
     name: existingUser.name,
+    role: existingUser.role,
 
   };
 
